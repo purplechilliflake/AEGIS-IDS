@@ -1,0 +1,85 @@
+import pandas as pd
+import joblib
+import matplotlib.pyplot as plt
+import numpy as np
+import seaborn as sns
+import os
+from sklearn.metrics import (
+    confusion_matrix,
+    classification_report,
+    roc_curve,
+    auc
+)
+
+class ModelEvaluator:
+    def __init__(self):
+        self.model = joblib.load("models/intrusion_detection_rf.pkl")
+        self.test = pd.read_csv("data/BoT-IoT/processed/test.csv")
+
+        # Ensure 'label' column exists
+        if 'label' not in self.test.columns:
+            raise ValueError("Test set must contain a 'label' column.")
+
+        self.X_test = self.test.drop(columns=[col for col in ['class', 'label', 'difficulty_level'] if col in self.test.columns])
+        self.y_test = self.test['label']
+
+    def generate_confusion_matrix(self):
+        y_pred = self.model.predict(self.X_test)
+        cm = confusion_matrix(self.y_test, y_pred)
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(cm, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=['Normal', 'Anomaly'],
+                    yticklabels=['Normal', 'Anomaly'])
+        plt.title('Confusion Matrix')
+        plt.xlabel('Predicted')
+        plt.ylabel('Actual')
+        plt.tight_layout()
+        plt.savefig('results/confusion_matrix.png')
+        plt.close()
+
+    def generate_roc_curve(self):
+        y_proba = self.model.predict_proba(self.X_test)[:, 1]
+        fpr, tpr, _ = roc_curve(self.y_test, y_proba)
+        roc_auc = auc(fpr, tpr)
+        print(f"📈 ROC AUC: {roc_auc:.4f}")
+        plt.figure()
+        plt.plot(fpr, tpr, label=f'AUC = {roc_auc:.4f}')
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('ROC Curve')
+        plt.legend(loc='lower right')
+        plt.tight_layout()
+        plt.savefig('results/roc_curve.png')
+        plt.close()
+
+    def generate_feature_importance(self):
+        importances = self.model.feature_importances_
+        sorted_idx = np.argsort(importances)[::-1]
+        plt.figure(figsize=(10, 8))
+        plt.title('Top Feature Importances')
+        plt.barh(range(len(sorted_idx)), importances[sorted_idx], align='center')
+        plt.yticks(range(len(sorted_idx)), [self.X_test.columns[i] for i in sorted_idx])
+        plt.gca().invert_yaxis()
+        plt.xlabel('Relative Importance')
+        plt.tight_layout()
+        plt.savefig('results/feature_importance.png')
+        plt.close()
+
+    def save_classification_report(self):
+        y_pred = self.model.predict(self.X_test)
+        report = classification_report(self.y_test, y_pred, target_names=["Normal", "Anomaly"])
+        print("\n📄 Classification Report:")
+        print(report)
+        with open("results/classification_report.txt", "w") as f:
+            f.write(report)
+
+if __name__ == "__main__":
+    os.makedirs("results", exist_ok=True)
+    evaluator = ModelEvaluator()
+    print("🔍 Generating evaluation visualizations...")
+    evaluator.generate_confusion_matrix()
+    evaluator.generate_roc_curve()
+    evaluator.generate_feature_importance()
+    evaluator.save_classification_report()
+    print("\n✅ Evaluation complete! Check the 'results/' directory.")

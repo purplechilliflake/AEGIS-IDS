@@ -1,0 +1,8 @@
+models/*.pkl
+data/
+__pycache__/
+__MACOSX/
+*.pyc
+.env
+*.DS_Store
+venv/
