@@ -6,3 +6,6 @@ __MACOSX/
 .env
 *.DS_Store
 venv/
+*.zip
+*.arff
+compiled_alert_logger.json
